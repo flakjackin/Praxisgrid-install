@@ -1,0 +1,46 @@
+name: praxisgrid
+
+# Docker Desktop named volumes keep PraxisGrid state inside its Linux VM.
+# That preserves the POSIX ownership and locking guarantees the backend and
+# runner need, without writing container-owned files into a macOS directory.
+services:
+  volume-init:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.runner
+    image: ${PRAXISGRID_IMAGE_PREFIX:-ghcr.io/flakjackin/praxisgrid}-runner:${PRAXISGRID_TAG:-0.3.2}
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        mkdir -p /data /credentials /workspace/tools/bin /workspace/worktrees /workspace/repos
+        && chown -R 10001:10001 /data /credentials /workspace
+    volumes:
+      - praxisgrid-data:/data
+      - praxisgrid-credentials:/credentials
+      - praxisgrid-workspace:/workspace
+      - praxisgrid-repos:/workspace/repos
+
+  backend:
+    depends_on:
+      volume-init:
+        condition: service_completed_successfully
+    volumes:
+      - praxisgrid-data:/data
+      - praxisgrid-workspace:/workspace:ro
+
+  runner:
+    environment:
+      PRAXISGRID_RUNNER_ID: macos-runner
+      PRAXISGRID_RUNNER_NAME: macOS Docker Desktop runner
+    volumes:
+      - praxisgrid-data:/data
+      - praxisgrid-credentials:/credentials
+      - praxisgrid-workspace:/workspace
+      - praxisgrid-repos:/workspace/repos
+
+volumes:
+  praxisgrid-data:
+  praxisgrid-credentials:
+  praxisgrid-workspace:
+  praxisgrid-repos:
